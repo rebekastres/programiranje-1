@@ -6,9 +6,39 @@ Pri vseh nalogah se vam pod razdelkom **RAM** splača nastaviti _View_ na _Decim
 
 Zapišite program, ki v register `A` zapiše ostanek pri deljenju registra `A` z registrom `B`.
 
+MOV A,15
+MOV B,7
+CALL deljenje
+CALL ostanek
+HLT
+
+deljenje:
+	MOV C,A		;v register C shranimo vrednost A
+	DIV B		;delimo direktno na A
+	RET
+
+ostanek:
+	MUL B
+	SUB C,A
+	MOV A,C		;v register A shrani ostanek pri deljenju A&B
+	RET
+
+
+
 ## Zaporedna števila
 
 Zapišite program, ki na sklad zaporedno postavlja števila od 13 do 42.
+
+MOV A, 13
+CALL .loop
+HLT
+
+.loop:
+	PUSH A
+	INC A
+	CMP A,42
+	JBE .loop
+	RET
 
 ## Menjava pomnilniških celic
 
