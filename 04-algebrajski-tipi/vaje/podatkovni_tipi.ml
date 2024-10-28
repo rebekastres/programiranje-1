@@ -57,7 +57,12 @@
  Nato napišite testni primer, ki bi predstavljal "[5; true; false; 7]".
 [*----------------------------------------------------------------------------*)
 
+type intbool_list = 
+ | Nil  (* za prazen seznam ne moremo uporabiti oznake [] to v OCaml označuje nekaj drugega *)
+ | Int of int * intbool_list (* z * označujemo kartezični produkt *)
+ | Bool of bool * intbool_list
 
+let primer = Int(5, Bool(true, Bool(false, Int(7, Nil))))
 
 (*----------------------------------------------------------------------------*]
  Funkcija [intbool_map f_int f_bool ib_list] preslika vrednosti [ib_list] v nov
@@ -65,7 +70,10 @@
  oz. [f_bool].
 [*----------------------------------------------------------------------------*)
 
-let rec intbool_map = ()
+let rec intbool_map f_int f_bool = function
+| Nil -> Nil
+| Int (i, ib_list) -> Int (f_int i, intbool_map f_int f_bool ib_list)
+| Bool (b, ib_list) -> Bool (f_bool b, intbool_map f_int f_bool ib_list) 
 
 (*----------------------------------------------------------------------------*]
  Funkcija [intbool_reverse] obrne vrstni red elementov [intbool_list] seznama.
