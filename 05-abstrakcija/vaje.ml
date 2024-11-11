@@ -17,12 +17,14 @@
 
 module type NAT = sig
   type t
-
   val eq  : t -> t -> bool
   val zero : t
-  (* Dodajte manjkajoče! *)
-  (* val to_int : t -> int *)
-  (* val of_int : int -> t *)
+  val enka : t
+  val to_int : t -> int
+  val of_int : int -> t
+  val sestevanje : t -> t -> int
+  val odstevanje : t -> t -> int 
+  val mnozenje : t -> t -> int
 end
 
 (*----------------------------------------------------------------------------*
@@ -35,10 +37,29 @@ end
 
 module Nat_int : NAT = struct
 
-  type t = int
-  let eq x y = failwith "later"
-  let zero = 0
-  (* Dodajte manjkajoče! *)
+  type t = 
+    | Zero
+    | Succ of t
+  let rec eq x y = match x, y with
+    | Zero, Zero -> true
+    | Succ _, Zero -> false
+    | Zero, Succ _ -> false
+    | Succ x', Succ y' -> eq x' y'
+  let zero = Zero
+  let enka = Succ zero
+  let to_int (x : t) = 
+    let rec aux acc = function
+    | Zero -> acc
+    | Succ x' -> aux (acc + 1) x'
+  in aux 0 x
+  let of_int x = 
+    let rec aux acc = function
+    | 0 -> acc
+    | x' -> aux (Succ enka) x'
+  in aux Zero x
+  let sestevanje x y = to_int x + to_int y
+  let odstevanje x y = to_int x - to_int y
+  let mnozenje x y = to_int x * to_int y
 
 end
 
@@ -53,9 +74,20 @@ end
 
 module Nat_peano : NAT = struct
 
-  type t = unit (* To morate spremeniti! *)
-  let eq x y = failwith "later"
-  let zero = () (* To morate spremeniti! *)
+  type t = { Zero : int; Succ : int }
+  let rec eq x y = match x, y with
+  | (x.Zero = y.Zero) -> true
+  | (x.Zero != y.Zero) -> false
+  | (x.Succ = y.Succ) -> true
+  | (x.Succ != y.Succ) -> false
+  let zero = Zero 
+  let enka = Succ zero
+  let to_int = failwith "later"
+  let of_int = failwith "later"
+  let sestevanje = failwith "later"
+  let odstevanje = failwith "later"
+  let mnozenje = failwith "later"
+
   (* Dodajte manjkajoče! *)
 
 end
