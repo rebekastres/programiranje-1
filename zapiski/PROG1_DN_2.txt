@@ -1,0 +1,369 @@
+type register = A | B | C | D
+type expression = Register of register | Const of int
+type address = Address of int
+
+type instruction =
+  | MOV of register * expression
+  | ADD of register * expression
+  | SUB of register * expression
+  | INC of register
+  | DEC of register
+  | MUL of expression
+  | DIV of expression
+  | AND of register * expression
+  | OR of register * expression
+  | XOR of register * expression
+  | NOT of register
+  | CMP of register * expression
+  | JMP of address
+  | JA of address
+  | JAE of address
+  | JB of address
+  | JBE of address
+  | JE of address
+  | JNE of address
+  | CALL of address
+  | RET
+  | PUSH of expression
+  | POP of register
+  | HLT
+
+type state = {
+  instructions : instruction array;
+  a : int; b : int; c : int; d : int;
+  ip : address;
+  zero : bool; carry : bool;
+  stack : int list;
+}
+
+let empty = {
+  instructions = [||];
+  a = 0;
+  b = 0;
+  c = 0;
+  d = 0;
+  ip = Address 0;
+  zero = false;
+  carry = false;
+  stack = [];
+}
+
+let init : instruction list -> state = fun sez -> {empty with instructions = Array.of_list sez}
+
+let int_of_address a = match a with
+  | Address x -> x
+
+let read_instruction : state -> instruction option =
+  fun stanje -> if Array.length (stanje.instructions) >= (int_of_address stanje.ip + 1) then Some stanje.instructions.(int_of_address stanje.ip) else None
+
+let read_register : state -> register -> int = 
+  fun stanje r -> match r with
+    | A -> stanje.a
+    | B -> stanje.b
+    | C -> stanje.c
+    | D -> stanje.d
+
+let read_expression : state -> expression -> int = 
+  fun stanje e -> match e with 
+    | Register x -> read_register stanje x
+    | Const y -> y
+
+let write_register : state -> register -> int -> state = 
+  fun stanje r x -> match r with
+    | A -> { stanje with a = x }
+    | B -> { stanje with b = x }
+    | C -> { stanje with c = x }
+    | D -> { stanje with d = x }
+
+let perform_unop : (int -> int) -> state -> register -> state = 
+  fun f stanje r -> match r with
+    | A -> { stanje with a = f stanje.a }
+    | B -> { stanje with b = f stanje.b }
+    | C -> { stanje with c = f stanje.c }
+    | D -> { stanje with d = f stanje.d }
+    
+let perform_binop : (int -> int -> int) -> state -> register -> expression -> state = 
+  fun f stanje r e -> match r with
+    | A -> { stanje with a = f stanje.a (read_expression stanje e) }
+    | B -> { stanje with b = f stanje.b (read_expression stanje e) }
+    | C -> { stanje with c = f stanje.c (read_expression stanje e) }
+    | D -> { stanje with d = f stanje.d (read_expression stanje e) }
+
+let next : address -> address = 
+  fun a -> Address (int_of_address a + 1)
+
+let jump : state -> address -> state = 
+  fun stanje a -> { stanje with ip = a }
+
+let proceed : state -> state = 
+  fun stanje -> { stanje with ip = next stanje.ip }
+
+let push_stack : state -> int -> state = 
+  fun stanje x -> { stanje with stack = x :: stanje.stack}
+
+let pop_stack : state -> int * state = 
+  fun stanje -> match stanje.stack with
+    | [] -> failwith "Empty stack"
+    | x :: xs -> (x, {stanje with stack = xs})
+
+let compare : state -> int -> int -> state = 
+  fun stanje x_1 x_2 -> if x_1 != x_2 then (if x_1 < x_2 then {stanje with carry = true} else stanje) else {stanje with zero = true}
+
+let conditional_jump : state -> address -> bool -> state = 
+  fun stanje a pogoj -> if pogoj then {stanje with ip = a} else {stanje with ip = next stanje.ip}
+
+let call : state -> address -> state = 
+  fun stanje a -> {stanje with ip = a;  stack = (int_of_address stanje.ip) :: stanje.stack}
+
+let return : state -> state = 
+  fun stanje -> match stanje.stack with
+    | [] -> failwith "Empty stack"
+    | x :: xs -> {stanje with ip = Address x; stack = xs}
+
+
+let run_instruction st = function
+  | MOV (reg, exp) -> write_register st reg (read_expression st exp) |> proceed
+  | ADD (reg, exp) -> perform_binop ( + ) st reg exp |> proceed
+  | SUB (reg, exp) -> perform_binop ( - ) st reg exp |> proceed
+  | INC reg -> perform_unop succ st reg |> proceed
+  | DEC reg -> perform_unop pred st reg |> proceed
+  | MUL exp -> perform_binop ( * ) st A exp |> proceed
+  | DIV exp -> perform_binop ( / ) st A exp |> proceed
+  | AND (reg, exp) -> perform_binop ( land ) st reg exp |> proceed
+  | OR (reg, exp) -> perform_binop ( lor ) st reg exp |> proceed
+  | XOR (reg, exp) -> perform_binop ( lxor ) st reg exp |> proceed
+  | NOT reg -> perform_unop lnot st reg |> proceed
+  | CMP (reg, exp) -> compare st (read_register st reg) (read_expression st exp) |> proceed
+  | JMP add -> jump st add
+  | JA add -> conditional_jump st add (not st.carry && not st.zero)
+  | JAE add -> conditional_jump st add (not st.carry)
+  | JB add -> conditional_jump st add st.carry 
+  | JBE add -> conditional_jump st add (st.carry || st.zero)
+  | JE add -> conditional_jump st add st.zero
+  | JNE add -> conditional_jump st add (not st.zero)
+  | CALL add -> call st add
+  | RET -> return st
+  | PUSH exp -> push_stack st (read_expression st exp) |> proceed
+  | POP reg ->
+      let n, st' = pop_stack st in
+      write_register st' reg n |> proceed
+  | HLT -> failwith "Cannot execute instruction"
+
+let run_program2 : state -> state = 
+  let rec zanka_po_ukazih stanje ste dol = match (dol - ste - 1) with
+    | 0 ->  if stanje.instructions.(ste) = HLT then stanje else run_instruction stanje stanje.instructions.(ste)
+    | _ -> match stanje.instructions.(ste) with
+        | HLT -> stanje
+        | instr -> if (stanje.zero || stanje.carry) then zanka_po_ukazih { (run_instruction stanje instr) with zero = false; carry = false } (ste + 1) dol else zanka_po_ukazih (run_instruction stanje instr) (ste + 1) dol
+   in fun stanje -> zanka_po_ukazih stanje 0 (Array.length (stanje.instructions))
+
+let run_program3 : state -> state =
+  let rec zanka_po_ukazih stanje dol = match (dol - (int_of_address stanje.ip) - 1) with
+    | 0 -> stanje (* if stanje.instructions.(int_of_address stanje.ip) = HLT then stanje else run_instruction stanje stanje.instructions.(int_of_address stanje.ip) *)
+    | _ -> match stanje.instructions.(int_of_address stanje.ip) with
+      | HLT -> stanje
+      | instr -> if (stanje.zero || stanje.carry) then zanka_po_ukazih { (run_instruction stanje instr) with zero = false; carry = false } dol else zanka_po_ukazih (run_instruction stanje instr) dol
+  in fun stanje -> zanka_po_ukazih stanje (Array.length (stanje.instructions))
+
+let run_program : state -> state =
+  let rec zanka_po_ukazih stanje dol = 
+    if (int_of_address stanje.ip) < dol then 
+      match stanje.instructions.(int_of_address stanje.ip) with
+        | HLT -> stanje
+        | instr -> if (stanje.zero || stanje.carry) then zanka_po_ukazih { (run_instruction stanje instr) with zero = false; carry = false } dol else zanka_po_ukazih (run_instruction stanje instr) dol
+      else stanje
+  in fun stanje -> zanka_po_ukazih stanje (Array.length (stanje.instructions))
+      
+let fibonacci n = [
+  JMP (Address 20);
+(* fib: *)
+  (* ; Shranimo vrednosti registrov *)
+  PUSH (Register C);
+  PUSH (Register B);
+  (* ; V C shranimo začetno vrednost A *)
+  MOV (C, Register A);
+  (* ; Če je A = 0, je to tudi rezultat *)
+  CMP (A, Const 0);
+  JE (Address 17);  
+  (* ; Če je A = 1, je to tudi rezultat *)
+  CMP (A, Const 1); 
+  JE (Address 17);
+  (* ; V nasprotnem primeru najprej izračunamo fib(A - 1) in ga shranimo v B *)
+  DEC C;                  
+  MOV (A, Register C);    
+  CALL (Address 1);       
+  MOV (B, Register A);    
+  (* ; Nato izračunamo še fib(A - 2) in ga shranimo v A *)
+  DEC C;                  
+  MOV (A, Register C);    
+  CALL (Address 1); 
+  (* ; Nazadnje k A prištejemo še B, s čimer dobimo končni rezultat *)
+  ADD (A, Register B);
+  JMP (Address 17); 
+(* .fib_end: *)
+  (* ; Povrnemo vrednosti registrov in vrnemo rezultat *)
+  POP B;                  
+  POP C;                 
+  RET;                    
+(* main: *)
+  MOV (A, Const n);       
+  CALL (Address 1);       
+  HLT;                   
+]
+let primer_izvajanje_16 =
+  fibonacci 10
+  |> init
+  |> run_program
+
+
+let parse_register : string -> register = 
+  fun reg -> match reg with
+    | "A" -> A
+    | "B" -> B 
+    | "C" -> C 
+    | "D" -> D 
+    | _ -> failwith "Napačna oznaka registra"
+
+let parse_expression : string -> expression =
+  fun exp -> match exp with
+    | "A" -> Register A 
+    | "B" -> Register B 
+    | "C" -> Register C 
+    | "D" -> Register D 
+    |  x -> if (int_of_string_opt x) = None then failwith "Napačna oznaka izraza" else Const (int_of_string x)
+
+let clean_line : string -> string =  (* String.index_opt in String.sub*)
+  let poz_podpicja_opt bes = String.index_opt bes ';' in
+  let pozicija poz_opt = match poz_opt with
+    | None -> 0
+    | Some x -> x
+  in
+  let brez_komentarja bes poz_opt = if poz_podpicja_opt bes = None then bes else String.sub bes 0 (pozicija poz_opt) in
+  fun bes -> String.trim (brez_komentarja bes (poz_podpicja_opt bes))
+
+let clean_lines : string list -> string list =
+  let rec ocisti sez nov_sez = match sez with
+    | [] -> nov_sez
+    | x :: xs -> if clean_line x = "" then ocisti xs nov_sez else ocisti xs ((clean_line x) :: nov_sez)
+  in
+  fun sez -> ocisti sez []
+
+let parse_address : (string * address) list -> string -> address = 
+  let bes_iz_para (b, st) = b in
+  let add_iz_para (b, add) = add in
+  let rec primerjaj sez bes = match sez with
+    | [] -> if int_of_string_opt bes = None then failwith "Podatki niso ustrezni" else Address (int_of_string bes)
+    | x :: xs -> if (bes_iz_para x) = bes then add_iz_para x else primerjaj xs bes
+  in
+  fun sez -> primerjaj sez
+  
+let parse_label : string -> string option =
+  fun bes -> if (String.contains_from bes (String.length bes - 2) ':') then Some (String.sub bes 0 (String.length bes - 1)) else None 
+
+let parse_labels : string list -> (string * address) list * string list = 
+  let vrednost_iz_opt bes_opt = match bes_opt with
+    | None -> ""
+    | Some x -> x
+  in
+  let rec priredi_add sez nov_sez st = match sez with
+    | [] -> nov_sez
+    | x :: xs -> priredi_add xs ((x, Address st) :: nov_sez) (st + 1)
+  in
+  let rec loci_ukaze_oznake sez_bes sez_oznake sez_ukazi = match sez_bes with
+    | [] -> (priredi_add (List.rev sez_oznake) [] 1, List.rev sez_ukazi)
+    | x :: xs -> if parse_label x = None then loci_ukaze_oznake xs sez_oznake (x :: sez_ukazi) else loci_ukaze_oznake xs ((vrednost_iz_opt (parse_label x)) :: sez_oznake) sez_ukazi
+  in
+  fun sez_bes -> loci_ukaze_oznake sez_bes [] []
+  
+let parse_instruction labels line =
+  let tokens =
+    line
+    |> String.split_on_char ' '
+    |> List.concat_map (String.split_on_char ',')
+    |> List.map String.trim
+    |> List.filter (fun token -> token <> "")
+  in
+  match tokens with
+  | ["MOV"; reg; exp] -> MOV (parse_register reg, parse_expression exp)
+  | ["ADD"; reg; exp] -> ADD (parse_register reg, parse_expression exp)
+  | ["SUB"; reg; exp] -> SUB (parse_register reg, parse_expression exp)
+  | ["INC"; reg] -> INC (parse_register reg)
+  | ["DEC"; reg] -> DEC (parse_register reg)
+  | ["MUL"; exp] -> MUL (parse_expression exp)
+  | ["DIV"; exp] -> DIV (parse_expression exp)
+  | ["AND"; reg; exp] -> AND (parse_register reg, parse_expression exp)
+  | ["OR"; reg; exp] -> OR (parse_register reg, parse_expression exp) 
+  | ["XOR"; reg; exp] -> XOR (parse_register reg, parse_expression exp)
+  | ["NOT"; reg] -> NOT (parse_register reg)
+  | ["CMP"; reg; exp] -> CMP (parse_register reg, parse_expression exp)
+  | ["JMP"; add] -> JMP (parse_address labels add)
+  | ["JA"; add] -> JA (parse_address labels add)
+  | ["JAE"; add] -> JAE (parse_address labels add)
+  | ["JB"; add] -> JB (parse_address labels add)
+  | ["JBE"; add] -> JBE (parse_address labels add)
+  | ["JE"; add] -> JE (parse_address labels add)
+  | ["JNE"; add] -> JNE (parse_address labels add)
+  | ["CALL"; add] -> CALL (parse_address labels add)
+  | ["RET"] -> RET
+  | ["PUSH"; exp] -> PUSH (parse_expression exp)
+  | ["POP"; reg] -> POP (parse_register reg)
+  | ["HLT"] -> HLT
+  | _ -> failwith ("Invalid instruction: " ^ line)
+
+let run bes = 
+  let izlusci_ukaze par = (fun (oznake, ukazi) -> ukazi) par in
+  let izlusci_oznake par = (fun (oznake, ukazi) -> oznake) par in
+  let pripravi_zacetno_stanje niz = 
+    let urejeni_par = parse_labels (clean_lines (String.split_on_char '\n' niz)) in
+    let sez_ukazov = List.map (parse_instruction (izlusci_oznake urejeni_par)) (izlusci_ukaze urejeni_par) in
+    init sez_ukazov 
+  in run_program (pripravi_zacetno_stanje bes)
+  
+let fibonacci = {|
+  JMP main
+  ; Funkcija, ki izračuna fib(A) in vrednost shrani v register A
+  fib:
+      ; Shranimo vrednosti registrov
+      PUSH C
+      PUSH B
+  
+      ; V C shranimo začetno vrednost A
+      MOV C, A
+  
+      ; Če je A = 0, je to tudi rezultat
+      CMP A, 0
+      JE .fib_end
+  
+      ; Če je A = 1, je to tudi rezultat
+      CMP A, 1
+      JE .fib_end
+  
+      ; V nasprotnem primeru najprej izračunamo fib(A - 1) in ga shranimo v B
+      DEC C
+      MOV A, C
+      CALL fib
+      MOV B, A
+  
+      ; Nato izračunamo še fib(A - 2) in ga shranimo v A
+      DEC C
+      MOV A, C
+      CALL fib
+      
+      ; Nazadnje k A prištejemo še B, s čimer dobimo končni rezultat
+      ADD A, B
+      JMP .fib_end
+  
+  .fib_end:
+      ; Povrnemo vrednosti registrov in vrnemo rezultat
+      POP B
+      POP C
+      RET
+  
+  main:
+      MOV A, 7
+      CALL fib
+  HLT
+|}
+
+let primer_branje_11 =
+  run fibonacci
