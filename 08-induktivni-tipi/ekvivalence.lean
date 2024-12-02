@@ -7,21 +7,29 @@ def concat {A : Type} : List A → List A → List A :=
 #check (concat ["a", "b"] ["c", "d"])
 
 def reverse {A : Type} : List A → List A :=
-  sorry
-
+  fun xs =>
+    let rec pomozna (xs : List A) (ys : List A) : List A :=
+      match xs with
+      | [] => ys
+      | x :: xs' => pomozna xs' (x :: ys)
+    pomozna xs []
 
 #check (reverse ["a", "b", "c", "d"])
 
 def length {A : Type} : List A → Nat :=
-  sorry
-
+  fun xs =>
+    let rec pomozna (xs : List A) (st : Nat) :=
+      match xs with
+      | [] => st
+      | x :: xs' => pomozna xs' (st + 1)
+    pomozna xs 0
 
 #check (length ["a", "b", "c", "d"])
 
-theorem trd1  {A : Type} {x : A} : reverse [x] = [x] :=
+theorem trd1  {A : Type} {x : A} : reverse [x] = [x] := -- ne moremo delati indukcije po x, saj ne vemo, kaj tocno je x (o njem vemo samo tip)
   sorry
 
-theorem trd2 {A : Type} {xs ys : List A} : length (concat xs ys) = length xs + length ys :=
+theorem trd2 {A : Type} {xs ys : List A} : length (concat xs ys) = length xs + length ys := -- v zvezku napisano, precej podobno
   sorry
 
 -- Tega poznamo že iz predavanj
@@ -35,7 +43,13 @@ theorem trd3 {A : Type} {xs : List A} : concat xs [] = xs :=
       rw [ih]
 
 theorem trd4 {A : Type} {xs ys zs : List A} : concat (concat xs ys) zs = concat xs (concat ys zs) :=
-  sorry
+    by
+    induction xs with
+    | nil =>
+      simp [concat]
+    | cons x xs' ih =>
+      simp [concat]
+      exact ih
 
 theorem trd5 {A : Type} {xs ys : List A} : reverse (concat xs ys) = concat (reverse ys) (reverse xs) :=
   sorry
@@ -89,10 +103,19 @@ theorem max_comm {a b : Nat} : Nat.max a b = Nat.max b a :=
   sorry
 
 def mirror {A : Type} : tree A → tree A :=
-  sorry
+  fun t =>
+    match t with
+    | tree.empty => tree.empty
+    | tree.node x l r => tree.node x (mirror r) (mirror l)
 
 theorem mirror_depth {A : Type} {t : tree A} : depth (mirror t) = depth t :=
-  sorry
+  by
+    induction t with
+    | empty => simp [mirror]
+    | node x l r ihl ihr =>
+      simp [mirror, depth]
+      rw [ihl, ihr]
+      rw [max_comm]
 
 theorem mirror_mirror {A : Type} {t : tree A} : mirror (mirror t) = t :=
   sorry
