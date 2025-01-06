@@ -48,7 +48,6 @@ theorem cisto_pravi_gauss : (n : Nat) → vsota_prvih n = (n * (n + 1)) / 2 :=
     intro n
     rw [← gauss n] -- Use the proven gauss theorem
     simp [Nat.mul_div_cancel] -- Simplify the result using division by 2
-
 /------------------------------------------------------------------------------
  ## Vektorji
 
@@ -71,13 +70,10 @@ def stakni : {A : Type} → {m n : Nat} → Vektor A m → Vektor A n → Vektor
   | .sestavljen x xs' => by rw [Nat.add_right_comm]; exact Vektor.sestavljen x (stakni xs' ys)
 
 def obrni : {A : Type} → {n : Nat} → Vektor A n → Vektor A n :=
-  fun {A} {n} xs =>
-    let rec pomozna {m : Nat} (xs : Vektor A m) (acc : Vektor A n) :=
-      match xs with
-      | .prazen => acc
-      | .sestavljen x xs' => pomozna xs' (Vektor.sestavljen x acc)
-    pomozna xs Vektor.prazen
-
+  fun xs =>
+    match xs with
+    | .prazen => .prazen
+    | .sestavljen x xs' => stakni (obrni xs') (.sestavljen x .prazen)
 
 def glava : {A : Type} → {n : Nat} → Vektor A (n + 1) -> A :=
   fun {A} {n} xs =>
@@ -109,10 +105,14 @@ theorem forall_implies' : {A : Type} → {P : Prop} → {Q : A → Prop} →
     intros A P Q
     apply Iff.intro
     -- Dokaz leve strani
-    intros h p x
+    intro h
+    intro p
+    intro x
     exact h x p
     -- Dokaz desne strani
-    intros h1 x h2
+    intro h1
+    intro x
+    intro h2
     apply h1
     apply h2
 
@@ -135,7 +135,6 @@ theorem paradoks_pivca :
       intro h'
       exfalso
       exact hp ⟨g, h'⟩
-
 
 /------------------------------------------------------------------------------
  ## Dvojiška drevesa
