@@ -17,14 +17,20 @@ Natančno definirajte pogoje, da funkcija `f` uredi seznam.
  # insert 7 [];;
  - : int list = [7]
 [*----------------------------------------------------------------------------*)
-
+let insert y xs =
+  let yxs = y :: xs in
+  List.sort (fun x y -> compare x y) yxs
 
 (*----------------------------------------------------------------------------*]
  Prazen seznam je že urejen. Funkcija [insert_sort] uredi seznam tako da
  zaporedoma vstavlja vse elemente seznama v prazen seznam.
 [*----------------------------------------------------------------------------*)
-
-
+let insert_sort sez =
+  let rec pomozna sez nov_sez = 
+    match sez with
+    | [] -> nov_sez
+    | h :: t -> pomozna t (insert h nov_sez)
+  in pomozna sez []
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*]
  Urejanje z Izbiranjem
@@ -105,7 +111,18 @@ Natančno definirajte pogoje, da funkcija `f` uredi seznam.
  # let l = randlist 10 10 ;;
  val l : int list = [0; 1; 0; 4; 0; 9; 1; 2; 5; 4]
 [*----------------------------------------------------------------------------*)
+(*ko delamo z array velikokrat lažje delati s for zanko // ne uporabljaj List.nth *)
+(*v list lahko hitro dodajamo in jemljemo stvari na začetku in na koncu, 
+v arrayu pa lahko hitro dostopamo do posameznih elementov*)
 
+let randlist len max =
+  let rec pomozna sez st = 
+    match st with
+    | 0 -> (Random.int max) :: sez
+    | _ -> pomozna ((Random.int max) :: sez) (st - 1)
+    in pomozna [] len
+
+let l = randlist 10 10
 
 (*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*]
  Sedaj lahko s pomočjo [randlist] primerjamo našo urejevalno funkcijo (imenovana
@@ -114,3 +131,4 @@ Natančno definirajte pogoje, da funkcija `f` uredi seznam.
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  let test = (randlist 100 100) in (our_sort test = List.sort compare test);;
 [*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*)
+
