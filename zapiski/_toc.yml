@@ -54,4 +54,8 @@ parts:
 >>>>>>> 158167c0dd5b06be071a19e45087ea47ac2ebb08
 =======
   - file: dn-2.ipynb
+<<<<<<< HEAD
 >>>>>>> 0cbcb5510866b7801b4f8e737c254078c92e72f6
+=======
+  - file: dn-4.ipynb
+>>>>>>> 250c3bf5f856beb4fb75f9df8364c442bcbe7a0d
